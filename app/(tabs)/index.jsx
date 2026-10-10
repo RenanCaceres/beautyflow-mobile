@@ -8,16 +8,18 @@ import { agendamentosApi, servicosApi, clientesApi } from '../../src/services/ap
 import { agendarNotificacoesParaData, pedirPermissao } from '../../src/services/notifications';
 import { C, S, fmt, fmtHora } from '../../src/theme';
 
+const MESES_NOMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Calendário mensal
+// Calendário mensal (abre ao clicar na seta para baixo abaixo dos dias)
 // ─────────────────────────────────────────────────────────────────────────────
 function ModalCalendario({ dataAtual, onClose, onSelectData }) {
-  const [ano, setAno] = useState(parseInt(dataAtual.slice(0, 4)));
-  const [mes, setMes] = useState(parseInt(dataAtual.slice(5, 7)) - 1);
-
-  const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho',
-                 'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const [ano, setAno] = useState(parseInt(dataAtual.slice(0, 4), 10));
+  const [mes, setMes] = useState(parseInt(dataAtual.slice(5, 7), 10) - 1);
   const hoje = new Date().toISOString().slice(0, 10);
 
   const mudarMes = (delta) => {
@@ -50,30 +52,46 @@ function ModalCalendario({ dataAtual, onClose, onSelectData }) {
             <TouchableOpacity style={cal.navBtn} onPress={() => mudarMes(-1)}>
               <Text style={cal.navTxt}>‹</Text>
             </TouchableOpacity>
-            <Text style={cal.titulo}>{MESES[mes]} {ano}</Text>
+            <Text style={cal.titulo}>{MESES_NOMES[mes]} {ano}</Text>
             <TouchableOpacity style={cal.navBtn} onPress={() => mudarMes(1)}>
               <Text style={cal.navTxt}>›</Text>
             </TouchableOpacity>
           </View>
 
           <View style={cal.semanaRow}>
-            {DIAS_SEMANA.map((d) => (
+            {DIAS_CURTOS.map((d) => (
               <Text key={d} style={cal.semanaLabel}>{d}</Text>
             ))}
           </View>
 
           <View style={cal.grade}>
             {celulas.map((dia, i) => {
-              const selecionado = dia && toISO(dia) === dataAtual;
-              const ehHoje      = dia && toISO(dia) === hoje;
+              const iso = dia ? toISO(dia) : null;
+              const selecionado = iso && iso === dataAtual;
+              const ehHoje      = iso && iso === hoje;
               return (
                 <TouchableOpacity
                   key={i}
-                  style={[cal.celula, selecionado && cal.celulaSelected, !selecionado && ehHoje && cal.celulaHoje]}
-                  onPress={() => { if (!dia) return; onSelectData(toISO(dia)); onClose(); }}
+                  style={[
+                    cal.celula,
+                    selecionado && cal.celulaSelected,
+                    !selecionado && ehHoje && cal.celulaHoje,
+                  ]}
+                  onPress={() => {
+                    if (!dia) return;
+                    onSelectData(iso);
+                    onClose();
+                  }}
                   disabled={!dia}
                 >
-                  <Text style={[cal.celulaText, selecionado && cal.celulaSelectedText, !selecionado && ehHoje && cal.celulaHojeText, !dia && { opacity: 0 }]}>
+                  <Text
+                    style={[
+                      cal.celulaText,
+                      selecionado && cal.celulaSelectedText,
+                      !selecionado && ehHoje && cal.celulaHojeText,
+                      !dia && { opacity: 0 },
+                    ]}
+                  >
                     {dia || '·'}
                   </Text>
                 </TouchableOpacity>
@@ -81,7 +99,13 @@ function ModalCalendario({ dataAtual, onClose, onSelectData }) {
             })}
           </View>
 
-          <TouchableOpacity style={cal.btnHoje} onPress={() => { onSelectData(hoje); onClose(); }}>
+          <TouchableOpacity
+            style={cal.btnHoje}
+            onPress={() => {
+              onSelectData(hoje);
+              onClose();
+            }}
+          >
             <Text style={cal.btnHojeTxt}>Ir para hoje</Text>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -91,15 +115,15 @@ function ModalCalendario({ dataAtual, onClose, onSelectData }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Relógio – seletor de hora e minuto
+// Relógio circular interativo — seleciona a hora e depois os minutos
 // ─────────────────────────────────────────────────────────────────────────────
 function ModalRelogio({ horaAtual, onClose, onSelectHora }) {
   const partes = (horaAtual || '09:00').split(':');
   const h24Inicial = parseInt(partes[0], 10) || 0;
   const mInicial = parseInt(partes[1], 10) || 0;
 
-  const [modo, setModo] = useState('hora'); // 'hora' | 'minuto'
-  const [ampm, setAmpm] = useState(h24Inicial >= 12 ? 'PM' : 'AM');
+  const [modo, setModo]     = useState('hora'); // 'hora' | 'minuto'
+  const [ampm, setAmpm]     = useState(h24Inicial >= 12 ? 'PM' : 'AM');
   const [hora12, setHora12] = useState(h24Inicial % 12 === 0 ? 12 : h24Inicial % 12);
   const [minuto, setMinuto] = useState(mInicial - (mInicial % 5));
 
@@ -127,7 +151,7 @@ function ModalRelogio({ horaAtual, onClose, onSelectHora }) {
     onSelectHora(`${String(h24).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
   };
 
-  const numerosHora = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i));
+  const numerosHora   = Array.from({ length: 12 }, (_, i) => (i === 0 ? 12 : i));
   const numerosMinuto = Array.from({ length: 12 }, (_, i) => i * 5);
 
   let h24Display = hora12 % 12;
@@ -137,6 +161,10 @@ function ModalRelogio({ horaAtual, onClose, onSelectHora }) {
     <Modal animationType="fade" transparent onRequestClose={onClose}>
       <TouchableOpacity style={cal.overlay} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity activeOpacity={1} style={relogio.container}>
+          <Text style={{ fontSize: 12, color: C.muted, fontWeight: '600', marginBottom: 8 }}>
+            {modo === 'hora' ? 'Selecione a hora' : 'Agora selecione os minutos'}
+          </Text>
+
           <View style={relogio.display}>
             <TouchableOpacity onPress={() => setModo('hora')}>
               <Text style={[relogio.displayTxt, modo === 'hora' && relogio.displayTxtAtivo]}>
@@ -150,10 +178,16 @@ function ModalRelogio({ horaAtual, onClose, onSelectHora }) {
               </Text>
             </TouchableOpacity>
             <View style={relogio.ampmBox}>
-              <TouchableOpacity style={[relogio.ampmBtn, ampm === 'AM' && relogio.ampmBtnAtivo]} onPress={() => setAmpm('AM')}>
+              <TouchableOpacity
+                style={[relogio.ampmBtn, ampm === 'AM' && relogio.ampmBtnAtivo]}
+                onPress={() => setAmpm('AM')}
+              >
                 <Text style={[relogio.ampmTxt, ampm === 'AM' && relogio.ampmTxtAtivo]}>AM</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[relogio.ampmBtn, ampm === 'PM' && relogio.ampmBtnAtivo]} onPress={() => setAmpm('PM')}>
+              <TouchableOpacity
+                style={[relogio.ampmBtn, ampm === 'PM' && relogio.ampmBtnAtivo]}
+                onPress={() => setAmpm('PM')}
+              >
                 <Text style={[relogio.ampmTxt, ampm === 'PM' && relogio.ampmTxtAtivo]}>PM</Text>
               </TouchableOpacity>
             </View>
@@ -177,7 +211,9 @@ function ModalRelogio({ horaAtual, onClose, onSelectHora }) {
                     style={[relogio.numero, posicao(i), n === minuto && relogio.numeroAtivo]}
                     onPress={() => escolherMinuto(n)}
                   >
-                    <Text style={[relogio.numeroTxt, n === minuto && relogio.numeroTxtAtivo]}>{String(n).padStart(2, '0')}</Text>
+                    <Text style={[relogio.numeroTxt, n === minuto && relogio.numeroTxtAtivo]}>
+                      {String(n).padStart(2, '0')}
+                    </Text>
                   </TouchableOpacity>
                 ))}
           </View>
@@ -189,9 +225,6 @@ function ModalRelogio({ horaAtual, onClose, onSelectHora }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Campo de horário – abre o relógio ao focar, mas permanece digitável
-// ─────────────────────────────────────────────────────────────────────────────
 function CampoHora({ hora, setHora }) {
   const [modalAberto, setModalAberto] = useState(false);
   const inputRef = React.useRef(null);
@@ -199,8 +232,6 @@ function CampoHora({ hora, setHora }) {
 
   const abrirRelogio = () => {
     if (ignorarProximoFoco.current) {
-      // Foco disparado por nós mesmos (depois de tocar fora do relógio
-      // pra digitar manualmente) — não reabre o relógio nesse caso.
       ignorarProximoFoco.current = false;
       return;
     }
@@ -208,15 +239,11 @@ function CampoHora({ hora, setHora }) {
     setModalAberto(true);
   };
 
-  // Usuário escolheu hora/minuto no relógio: fecha sem devolver o foco
-  // (evita reabrir o próprio relógio via onFocus).
   const selecionarHora = (novaHora) => {
     setHora(novaHora);
     setModalAberto(false);
   };
 
-  // Usuário tocou fora do relógio: fecha e devolve o foco pro campo,
-  // liberando digitação manual como já era feito antes.
   const fecharParaDigitar = () => {
     setModalAberto(false);
     ignorarProximoFoco.current = true;
@@ -225,15 +252,20 @@ function CampoHora({ hora, setHora }) {
 
   return (
     <>
-      <TextInput
-        ref={inputRef}
-        style={S.input}
-        placeholder="HH:MM"
-        value={hora}
-        onChangeText={setHora}
-        onFocus={abrirRelogio}
-        showSoftInputOnFocus={!modalAberto}
-      />
+      <TouchableOpacity activeOpacity={0.85} onPress={() => setModalAberto(true)}>
+        <View style={[S.input, S.between, { marginBottom: 12 }]}>
+          <TextInput
+            ref={inputRef}
+            style={{ flex: 1, fontSize: 14, color: C.text, padding: 0 }}
+            placeholder="HH:MM"
+            value={hora}
+            onChangeText={setHora}
+            onFocus={abrirRelogio}
+            showSoftInputOnFocus={!modalAberto}
+          />
+          <Text style={{ fontSize: 13, color: C.pink, fontWeight: '600' }}>🕒 Relógio</Text>
+        </View>
+      </TouchableOpacity>
       {modalAberto && (
         <ModalRelogio
           horaAtual={hora}
@@ -245,10 +277,6 @@ function CampoHora({ hora, setHora }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Campo de data – abre o calendário ao focar, exibe em DD/MM/AAAA,
-// mas continua digitável (mesmo padrão do CampoHora acima)
-// ─────────────────────────────────────────────────────────────────────────────
 function paraExibicaoData(iso) {
   if (!iso || iso.length < 10) return '';
   const [ano, mes, dia] = iso.split('-');
@@ -268,8 +296,6 @@ function CampoData({ data, setData }) {
   const inputRef = React.useRef(null);
   const ignorarProximoFoco = React.useRef(false);
 
-  // Mantém o texto exibido em sincronia quando a data muda por fora
-  // (ex: usuário escolheu no calendário, ou o campo foi pré-populado).
   useEffect(() => { setTextoDigitado(paraExibicaoData(data)); }, [data]);
 
   const abrirCalendario = () => {
@@ -300,15 +326,20 @@ function CampoData({ data, setData }) {
 
   return (
     <>
-      <TextInput
-        ref={inputRef}
-        style={S.input}
-        placeholder="DD/MM/AAAA"
-        value={textoDigitado}
-        onChangeText={aoDigitar}
-        onFocus={abrirCalendario}
-        showSoftInputOnFocus={!modalAberto}
-      />
+      <TouchableOpacity activeOpacity={0.85} onPress={() => setModalAberto(true)}>
+        <View style={[S.input, S.between, { marginBottom: 12 }]}>
+          <TextInput
+            ref={inputRef}
+            style={{ flex: 1, fontSize: 14, color: C.text, padding: 0 }}
+            placeholder="DD/MM/AAAA"
+            value={textoDigitado}
+            onChangeText={aoDigitar}
+            onFocus={abrirCalendario}
+            showSoftInputOnFocus={!modalAberto}
+          />
+          <Text style={{ fontSize: 13, color: C.pink, fontWeight: '600' }}>📅 Calendário</Text>
+        </View>
+      </TouchableOpacity>
       {modalAberto && (
         <ModalCalendario
           dataAtual={data}
@@ -320,19 +351,36 @@ function CampoData({ data, setData }) {
   );
 }
 
+// Gera os 5 dias ao redor da data selecionada para a tira superior
+function gerarDiasAoRedor(dataIso) {
+  const base = new Date(dataIso + 'T12:00:00');
+  const lista = [];
+  for (let offset = -2; offset <= 2; offset++) {
+    const dt = new Date(base);
+    dt.setDate(base.getDate() + offset);
+    const iso = dt.toISOString().slice(0, 10);
+    lista.push({
+      iso,
+      semana: DIAS_CURTOS[dt.getDay()],
+      diaNum: dt.getDate(),
+    });
+  }
+  return lista;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Tela principal – Agenda
+// Tela principal – Agenda (Clean & Amigável)
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AgendaScreen() {
   const hoje = new Date().toISOString().slice(0, 10);
-  const [data, setData]             = useState(hoje);
-  const [agendamentos, setAgs]      = useState([]);
-  const [servicos, setServicos]     = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [modalNovo, setModalNovo]   = useState(false);
+  const [data, setData]               = useState(hoje);
+  const [agendamentos, setAgs]        = useState([]);
+  const [servicos, setServicos]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [modalNovo, setModalNovo]     = useState(false);
   const [modalEditar, setModalEditar] = useState(null);
-  const [modalBaixa, setModalBaixa] = useState(null);
-  const [modalCal, setModalCal]     = useState(false);
+  const [modalBaixa, setModalBaixa]   = useState(null);
+  const [modalCal, setModalCal]       = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -347,134 +395,228 @@ export default function AgendaScreen() {
     }
   }, [data]);
 
-  // Corrigido: pede a permissão de notificação SOMENTE depois que os agendamentos
-  // já carregaram, evitando que o diálogo de permissão (que tira o app do foreground
-  // por um instante) entre em corrida com o fetch inicial e derrube a conexão.
   useEffect(() => {
     carregar().then(() => {
       pedirPermissao();
     });
   }, [carregar]);
-  useEffect(() => { servicosApi.listar().then(setServicos).catch(() => {}); }, []);
 
-  const mudarData = (d) => {
+  useEffect(() => {
+    servicosApi.listar().then(setServicos).catch(() => {});
+  }, []);
+
+  const mudarData = (delta) => {
     const dt = new Date(data + 'T12:00:00');
-    dt.setDate(dt.getDate() + d);
+    dt.setDate(dt.getDate() + delta);
     setData(dt.toISOString().slice(0, 10));
   };
 
   const remover = (id) => {
-    Alert.alert('Confirmar', 'Remover agendamento?', [
-      { text: 'Cancelar' },
-      { text: 'Remover', style: 'destructive', onPress: async () => { await agendamentosApi.excluir(id); carregar(); } },
+    Alert.alert('Confirmar', 'Remover este agendamento?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Remover',
+        style: 'destructive',
+        onPress: async () => {
+          await agendamentosApi.excluir(id);
+          carregar();
+        },
+      },
     ]);
   };
 
-  const borderColor = { agendado: C.pink, realizado: C.green, cancelado: C.hint };
+  const diasVisiveis = gerarDiasAoRedor(data);
+  const dtAtual = new Date(data + 'T12:00:00');
+  const mesAnoExtenso = dtAtual.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
     <SafeAreaView style={S.screen} edges={['bottom']}>
-
-      {/* Navegação de data */}
-      <View style={[S.row, styles.navBar]}>
-        <TouchableOpacity style={styles.navBtn} onPress={() => mudarData(-1)}>
-          <Text style={styles.navTxt}>←</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setModalCal(true)} style={styles.dataPill}>
-          <Text style={{ fontWeight: '600', color: C.text }}>
-            {new Date(data + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+      {/* Subcabeçalho Clean com contador e botão + Agendar */}
+      <View style={styles.topHeader}>
+        <View>
+          <Text style={styles.topCount}>
+            {agendamentos.length} {agendamentos.length === 1 ? 'atendimento' : 'atendimentos'} no dia
           </Text>
-          <Text style={{ fontSize: 11, color: C.pink, marginLeft: 6 }}>▼</Text>
+        </View>
+        <TouchableOpacity style={styles.btnAgendarPill} onPress={() => setModalNovo(true)}>
+          <Text style={styles.btnAgendarPillText}>+ Agendar</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navBtn} onPress={() => mudarData(1)}>
-          <Text style={styles.navTxt}>→</Text>
+      </View>
+
+      {/* Seletor de Dias com Setas nas Extremidades + Seta para baixo para abrir o Calendário */}
+      <View style={styles.dateSelectorWrapper}>
+        <View style={styles.daysStripRow}>
+          <TouchableOpacity style={styles.edgeArrowBtn} onPress={() => mudarData(-1)}>
+            <Text style={styles.edgeArrowText}>‹</Text>
+          </TouchableOpacity>
+
+          <View style={styles.daysStripCenter}>
+            {diasVisiveis.map((item) => {
+              const ativo = item.iso === data;
+              return (
+                <TouchableOpacity
+                  key={item.iso}
+                  style={[styles.dayCard, ativo && styles.dayCardAtivo]}
+                  onPress={() => setData(item.iso)}
+                >
+                  <Text style={[styles.dayWeekTxt, ativo && styles.dayWeekTxtAtivo]}>
+                    {item.semana}
+                  </Text>
+                  <Text style={[styles.dayNumTxt, ativo && styles.dayNumTxtAtivo]}>
+                    {item.diaNum}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity style={styles.edgeArrowBtn} onPress={() => mudarData(1)}>
+            <Text style={styles.edgeArrowText}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Seta para baixo abaixo dos dias disponíveis para abrir o calendário */}
+        <TouchableOpacity
+          style={styles.openCalendarHandle}
+          activeOpacity={0.75}
+          onPress={() => setModalCal(true)}
+        >
+          <Text style={styles.openCalendarText}>{mesAnoExtenso}</Text>
+          <Text style={styles.openCalendarArrow}>▼</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={S.content}>
-        {loading
-          ? <ActivityIndicator color={C.pink} style={{ marginTop: 40 }} />
-          : agendamentos.length === 0
-            ? <Text style={[S.muted, { textAlign: 'center', marginTop: 60 }]}>Nenhum agendamento.</Text>
-            : agendamentos.map((a) => {
-                const temMultiplos = Array.isArray(a.servicos) && a.servicos.length > 0;
-                const totalValor   = temMultiplos
-                  ? a.servicos.reduce((s, sv) => s + parseFloat(sv.valor || 0), 0)
-                  : parseFloat(a.servico_valor || 0);
+        {loading ? (
+          <ActivityIndicator color={C.pink} style={{ marginTop: 40 }} />
+        ) : agendamentos.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 60 }}>
+            <Text style={[S.muted, { textAlign: 'center' }]}>Nenhum agendamento para este dia.</Text>
+            <TouchableOpacity
+              style={{ marginTop: 14, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 99, backgroundColor: C.pinkLight }}
+              onPress={() => setModalNovo(true)}
+            >
+              <Text style={{ color: C.pinkDark, fontWeight: '600', fontSize: 13 }}>+ Agendar horário</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          agendamentos.map((a) => {
+            const temMultiplos = Array.isArray(a.servicos) && a.servicos.length > 0;
+            const totalValor = a.valor_final
+              ? parseFloat(a.valor_final)
+              : temMultiplos
+                ? a.servicos.reduce((s, sv) => s + parseFloat(sv.valor || 0), 0)
+                : parseFloat(a.servico_valor || 0);
 
-                return (
-                  <View key={a.id} style={[S.card, { borderLeftWidth: 4, borderLeftColor: borderColor[a.status] || C.border }]}>
-                    <View style={S.between}>
-                      <Text style={[S.bold, { fontSize: 15 }]}>{a.cliente_nome}</Text>
-                      <Text style={{ fontSize: 12, fontWeight: '500', color: borderColor[a.status] }}>{a.status}</Text>
-                    </View>
+            const nomesServicos = temMultiplos
+              ? a.servicos.map((sv) => sv.nome).join(' • ')
+              : a.servico_nome;
 
-                    {temMultiplos ? (
-                      <>
-                        {a.servicos.map((sv, i) => (
-                          <Text key={i} style={[S.muted, { marginTop: i === 0 ? 2 : 1 }]}>• {sv.nome} — {fmt(sv.valor)}</Text>
-                        ))}
-                        {a.servicos.length > 1 && (
-                          <View style={styles.totalBadge}>
-                            <Text style={styles.totalBadgeTxt}>Total: {fmt(totalValor)}</Text>
-                          </View>
-                        )}
-                      </>
-                    ) : (
-                      <Text style={S.muted}>{a.servico_nome} — {fmt(a.servico_valor)}</Text>
-                    )}
+            const realizado = a.status === 'realizado';
+            const cancelado = a.status === 'cancelado';
 
-                    <Text style={S.hint}>{fmtHora(a.data_hora)}</Text>
-                    {a.observacao ? <Text style={[S.hint, { fontStyle: 'italic', marginTop: 4 }]}>{a.observacao}</Text> : null}
+            return (
+              <View key={a.id} style={styles.agCard}>
+                {/* Coluna esquerda de horário e status */}
+                <View style={styles.agTimeCol}>
+                  <Text style={styles.agHoraTxt}>{fmtHora(a.data_hora)}</Text>
+                  <Text
+                    style={[
+                      styles.agStatusTxt,
+                      realizado
+                        ? { color: C.green }
+                        : cancelado
+                          ? { color: C.red }
+                          : { color: C.hint },
+                    ]}
+                  >
+                    {realizado ? 'Pago' : cancelado ? 'Cancelado' : 'Aberto'}
+                  </Text>
+                </View>
 
-                    {/* Ações */}
-                    <View style={[S.row, { marginTop: 10, flexWrap: 'wrap', gap: 8 }]}>
-                      {a.status === 'agendado' && (
-                        <>
-                          <TouchableOpacity style={[styles.btnAcao, { backgroundColor: '#EEF2FF' }]} onPress={() => setModalEditar(a)}>
-                            <Text style={{ color: '#5C6BC0', fontSize: 12, fontWeight: '500' }}>✏️ Editar</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity style={[styles.btnAcao, { backgroundColor: C.greenLight }]} onPress={() => setModalBaixa(a)}>
-                            <Text style={{ color: C.green, fontSize: 12, fontWeight: '500' }}>✅ Dar Baixa</Text>
-                          </TouchableOpacity>
-                        </>
-                      )}
-                      <TouchableOpacity style={[styles.btnAcao, { backgroundColor: C.redLight }]} onPress={() => remover(a.id)}>
-                        <Text style={{ color: C.red, fontSize: 12, fontWeight: '500' }}>Remover</Text>
-                      </TouchableOpacity>
-                    </View>
+                {/* Coluna direita com detalhes do atendimento */}
+                <View style={styles.agMainCol}>
+                  <View style={S.between}>
+                    <Text style={styles.agClienteTxt} numberOfLines={1}>
+                      {a.cliente_nome}
+                    </Text>
+                    <Text style={styles.agValorTxt}>{fmt(totalValor)}</Text>
                   </View>
-                );
-              })
-        }
+
+                  <Text style={styles.agServicosTxt} numberOfLines={2}>
+                    {nomesServicos}
+                  </Text>
+
+                  {a.observacao ? (
+                    <Text style={styles.agObsTxt}>{a.observacao}</Text>
+                  ) : null}
+
+                  <View style={styles.agLinksRow}>
+                    {a.status === 'agendado' && (
+                      <>
+                        <TouchableOpacity onPress={() => setModalBaixa(a)}>
+                          <Text style={styles.linkBaixa}>Concluir / Baixa</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.dotSep}>•</Text>
+                        <TouchableOpacity onPress={() => setModalEditar(a)}>
+                          <Text style={styles.linkMuted}>Editar</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.dotSep}>•</Text>
+                      </>
+                    )}
+                    <TouchableOpacity onPress={() => remover(a.id)}>
+                      <Text style={styles.linkMuted}>Remover</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            );
+          })
+        )}
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} onPress={() => setModalNovo(true)}>
-        <Text style={{ color: 'white', fontSize: 24, lineHeight: 28 }}>+</Text>
-      </TouchableOpacity>
-
       {modalCal && (
-        <ModalCalendario dataAtual={data} onClose={() => setModalCal(false)} onSelectData={setData} />
+        <ModalCalendario
+          dataAtual={data}
+          onClose={() => setModalCal(false)}
+          onSelectData={(novaData) => setData(novaData)}
+        />
       )}
       {modalNovo && (
         <ModalNovoAgendamento
-          servicos={servicos} dataInicial={data}
+          servicos={servicos}
+          dataInicial={data}
           onClose={() => setModalNovo(false)}
-          onSalvo={() => { setModalNovo(false); carregar(); }}
+          onSalvo={() => {
+            setModalNovo(false);
+            carregar();
+          }}
         />
       )}
       {modalEditar && (
         <ModalEditarAgendamento
-          agendamento={modalEditar} servicos={servicos}
+          agendamento={modalEditar}
+          servicos={servicos}
           onClose={() => setModalEditar(null)}
-          onSalvo={() => { setModalEditar(null); carregar(); }}
+          onSalvo={() => {
+            setModalEditar(null);
+            carregar();
+          }}
         />
       )}
       {modalBaixa && (
         <ModalBaixa
-          agendamento={modalBaixa} servicos={servicos}
+          agendamento={modalBaixa}
+          servicos={servicos}
           onClose={() => setModalBaixa(null)}
-          onSalvo={() => { setModalBaixa(null); carregar(); }}
+          onSalvo={() => {
+            setModalBaixa(null);
+            carregar();
+          }}
         />
       )}
     </SafeAreaView>
@@ -482,7 +624,7 @@ export default function AgendaScreen() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Modal – Novo Agendamento
+// Modal – Novo Agendamento (com opção de criar nova cliente na hora)
 // ─────────────────────────────────────────────────────────────────────────────
 function ModalNovoAgendamento({ servicos, dataInicial, onClose, onSalvo }) {
   const [selecionados, setSelecionados] = useState([]);
@@ -492,6 +634,11 @@ function ModalNovoAgendamento({ servicos, dataInicial, onClose, onSalvo }) {
   const [clienteBusca, setBusca] = useState('');
   const [clienteLista, setLista] = useState([]);
   const [cliente, setCliente]    = useState(null);
+
+  // Cadastro rápido de cliente sem sair do modal
+  const [criandoCliente, setCriandoCliente] = useState(false);
+  const [novoNome, setNovoNome]             = useState('');
+  const [novoTel, setNovoTel]               = useState('');
 
   const totalSelecionado = selecionados.reduce((s, sv) => s + parseFloat(sv.valor || 0), 0);
 
@@ -509,6 +656,21 @@ function ModalNovoAgendamento({ servicos, dataInicial, onClose, onSalvo }) {
     setLista(r);
   };
 
+  const salvarClienteRapida = async () => {
+    if (!novoNome.trim() || !novoTel.trim()) {
+      return Alert.alert('Atenção', 'Preencha nome e WhatsApp da nova cliente.');
+    }
+    try {
+      const criada = await clientesApi.criar({ nome: novoNome.trim(), telefone: novoTel.trim() });
+      setCliente(criada);
+      setCriandoCliente(false);
+      setNovoNome('');
+      setNovoTel('');
+    } catch (e) {
+      Alert.alert('Erro', e.message);
+    }
+  };
+
   const salvar = async () => {
     if (!cliente)                  return Alert.alert('Atenção', 'Selecione uma cliente.');
     if (selecionados.length === 0) return Alert.alert('Atenção', 'Selecione ao menos um serviço.');
@@ -517,8 +679,6 @@ function ModalNovoAgendamento({ servicos, dataInicial, onClose, onSalvo }) {
         cliente_id:  cliente.id,
         servico_ids: selecionados.map((s) => s.id),
         servico_id:  selecionados[0].id,
-        // CORREÇÃO: adiciona offset -03:00 para que o PostgreSQL receba
-        // o horário local de Brasília e armazene corretamente.
         data_hora:   `${data}T${hora}:00-03:00`,
         observacao:  obs,
       });
@@ -529,20 +689,75 @@ function ModalNovoAgendamento({ servicos, dataInicial, onClose, onSalvo }) {
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-        <View style={[S.header, { borderBottomWidth: 1, borderBottomColor: C.border }]}>
-          <TouchableOpacity onPress={onClose}><Text style={{ color: C.muted }}>Cancelar</Text></TouchableOpacity>
+        <View style={S.header}>
+          <TouchableOpacity onPress={onClose}><Text style={{ color: C.muted }}>Fechar</Text></TouchableOpacity>
           <Text style={S.headerTitle}>Novo Agendamento</Text>
           <TouchableOpacity onPress={salvar}><Text style={{ color: C.pink, fontWeight: '600' }}>Salvar</Text></TouchableOpacity>
         </View>
-        <ScrollView style={{ padding: 16 }}>
-          <ClienteSelector cliente={cliente} setCliente={setCliente} clienteBusca={clienteBusca} buscarCliente={buscarCliente} clienteLista={clienteLista} setLista={setLista} setBusca={setBusca} />
-          <ServicoSelector servicos={servicos} selecionados={selecionados} toggleServico={toggleServico} totalSelecionado={totalSelecionado} />
+        <ScrollView style={{ padding: 18 }}>
+          <View style={[S.between, { marginBottom: 6 }]}>
+            <Text style={S.label}>Cliente *</Text>
+            <TouchableOpacity onPress={() => setCriandoCliente(!criandoCliente)}>
+              <Text style={{ fontSize: 12, color: C.pink, fontWeight: '600' }}>
+                {criandoCliente ? '← Buscar existente' : '+ Nova cliente'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {criandoCliente ? (
+            <View style={[S.card, { backgroundColor: C.pinkLight, borderColor: C.pinkSoft }]}>
+              <TextInput
+                style={S.input}
+                placeholder="Nome completo da cliente"
+                value={novoNome}
+                onChangeText={setNovoNome}
+              />
+              <TextInput
+                style={S.input}
+                placeholder="WhatsApp (43) 9 9000-0000"
+                keyboardType="phone-pad"
+                value={novoTel}
+                onChangeText={setNovoTel}
+              />
+              <TouchableOpacity style={S.btnPrimary} onPress={salvarClienteRapida}>
+                <Text style={S.btnPrimaryText}>Adicionar e selecionar</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <ClienteSelector
+              cliente={cliente}
+              setCliente={setCliente}
+              clienteBusca={clienteBusca}
+              buscarCliente={buscarCliente}
+              clienteLista={clienteLista}
+              setLista={setLista}
+              setBusca={setBusca}
+            />
+          )}
+
+          <ServicoSelector
+            servicos={servicos}
+            selecionados={selecionados}
+            toggleServico={toggleServico}
+            totalSelecionado={totalSelecionado}
+          />
           <Text style={[S.label, { marginTop: 8 }]}>Data *</Text>
           <CampoData data={data} setData={setData} />
           <Text style={S.label}>Horário *</Text>
           <CampoHora hora={hora} setHora={setHora} />
           <Text style={S.label}>Observação</Text>
-          <TextInput style={[S.input, { height: 80, textAlignVertical: 'top' }]} multiline value={obs} onChangeText={setObs} />
+          <TextInput
+            style={[S.input, { height: 75, textAlignVertical: 'top' }]}
+            multiline
+            value={obs}
+            onChangeText={setObs}
+            placeholder="Opcional..."
+          />
+          <TouchableOpacity style={[S.btnPrimary, { marginTop: 8, marginBottom: 30 }]} onPress={salvar}>
+            <Text style={S.btnPrimaryText}>
+              Confirmar Agendamento {totalSelecionado > 0 ? `• ${fmt(totalSelecionado)}` : ''}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -553,19 +768,13 @@ function ModalNovoAgendamento({ servicos, dataInicial, onClose, onSalvo }) {
 // Modal – Editar Agendamento
 // ─────────────────────────────────────────────────────────────────────────────
 function ModalEditarAgendamento({ agendamento, servicos, onClose, onSalvo }) {
-  // Pré-popula com os dados existentes
   const servicosIniciais = Array.isArray(agendamento.servicos) && agendamento.servicos.length > 0
-    ? servicos.filter((s) => agendamento.servicos.some((sv) => sv.id === s.id))
+    ? agendamento.servicos
     : servicos.filter((s) => s.id === agendamento.servico_id);
 
-  // CORREÇÃO: extrai data e hora diretamente da string ISO sem conversão de fuso
-  // ex: "2025-05-04T14:00:00.000Z" -> data="2025-05-04", hora="14:00"
-  const dataISO = agendamento.data_hora.slice(0, 10);
-  const horaStr = agendamento.data_hora.slice(11, 16);
-
   const [selecionados, setSelecionados] = useState(servicosIniciais);
-  const [data, setData] = useState(dataISO);
-  const [hora, setHora] = useState(horaStr);
+  const [data, setData] = useState(agendamento.data_hora.slice(0, 10));
+  const [hora, setHora] = useState(fmtHora(agendamento.data_hora));
   const [obs, setObs]   = useState(agendamento.observacao || '');
 
   const totalSelecionado = selecionados.reduce((s, sv) => s + parseFloat(sv.valor || 0), 0);
@@ -583,8 +792,6 @@ function ModalEditarAgendamento({ agendamento, servicos, onClose, onSalvo }) {
       await agendamentosApi.atualizar(agendamento.id, {
         servico_ids: selecionados.map((s) => s.id),
         servico_id:  selecionados[0].id,
-        // CORREÇÃO: adiciona offset -03:00 para que o PostgreSQL receba
-        // o horário local de Brasília e armazene corretamente.
         data_hora:   `${data}T${hora}:00-03:00`,
         observacao:  obs,
       });
@@ -595,27 +802,33 @@ function ModalEditarAgendamento({ agendamento, servicos, onClose, onSalvo }) {
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-        <View style={[S.header, { borderBottomWidth: 1, borderBottomColor: C.border }]}>
-          <TouchableOpacity onPress={onClose}><Text style={{ color: C.muted }}>Cancelar</Text></TouchableOpacity>
+        <View style={S.header}>
+          <TouchableOpacity onPress={onClose}><Text style={{ color: C.muted }}>Fechar</Text></TouchableOpacity>
           <Text style={S.headerTitle}>Editar Agendamento</Text>
           <TouchableOpacity onPress={salvar}><Text style={{ color: C.pink, fontWeight: '600' }}>Salvar</Text></TouchableOpacity>
         </View>
-
-        {/* Cliente (somente leitura) */}
-        <ScrollView style={{ padding: 16 }}>
-          <Text style={S.label}>Cliente</Text>
-          <View style={[S.card, { marginBottom: 12, backgroundColor: C.bg2 }]}>
-            <Text style={{ color: C.text, fontWeight: '500' }}>{agendamento.cliente_nome}</Text>
+        <ScrollView style={{ padding: 18 }}>
+          <View style={[S.card, { backgroundColor: C.pinkLight, borderColor: C.pinkSoft, marginBottom: 14 }]}>
+            <Text style={{ fontWeight: '600', color: C.pinkDark }}>{agendamento.cliente_nome}</Text>
+            <Text style={S.hint}>{agendamento.cliente_telefone}</Text>
           </View>
-
-          <ServicoSelector servicos={servicos} selecionados={selecionados} toggleServico={toggleServico} totalSelecionado={totalSelecionado} />
-
+          <ServicoSelector
+            servicos={servicos}
+            selecionados={selecionados}
+            toggleServico={toggleServico}
+            totalSelecionado={totalSelecionado}
+          />
           <Text style={[S.label, { marginTop: 8 }]}>Data *</Text>
           <CampoData data={data} setData={setData} />
           <Text style={S.label}>Horário *</Text>
           <CampoHora hora={hora} setHora={setHora} />
           <Text style={S.label}>Observação</Text>
-          <TextInput style={[S.input, { height: 80, textAlignVertical: 'top' }]} multiline value={obs} onChangeText={setObs} />
+          <TextInput
+            style={[S.input, { height: 75, textAlignVertical: 'top' }]}
+            multiline
+            value={obs}
+            onChangeText={setObs}
+          />
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -623,38 +836,19 @@ function ModalEditarAgendamento({ agendamento, servicos, onClose, onSalvo }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Modal – Dar Baixa (com serviços editáveis e valor ajustável)
+// Modal – Dar Baixa
 // ─────────────────────────────────────────────────────────────────────────────
 function ModalBaixa({ agendamento, servicos, onClose, onSalvo }) {
-  const [status, setStatus] = useState('realizado');
-  const [obs, setObs]       = useState('');
-
-  // Serviços pré-selecionados do agendamento
-  // CORREÇÃO: usa os dados completos de `servicos` (que vêm da API com valor correto),
-  // filtrando pelos IDs do agendamento. Isso garante que o valor seja o cadastrado,
-  // não um valor residual do objeto parcial retornado junto com o agendamento.
-  const idsDoAgendamento = Array.isArray(agendamento.servicos) && agendamento.servicos.length > 0
-    ? agendamento.servicos.map((sv) => sv.id)
-    : agendamento.servico_id ? [agendamento.servico_id] : [];
-
-  const servicosIniciais = servicos.filter((s) => idsDoAgendamento.includes(s.id));
+  const servicosIniciais = Array.isArray(agendamento.servicos) && agendamento.servicos.length > 0
+    ? agendamento.servicos
+    : servicos.filter((s) => s.id === agendamento.servico_id);
 
   const [selecionados, setSelecionados] = useState(servicosIniciais);
-  const [valorEditado, setValorEditado] = useState(false);
+  const [status, setStatus]             = useState('realizado');
+  const [obs, setObs]                   = useState(agendamento.observacao || '');
+  const [valorCustom, setValorCustom]   = useState('');
 
-  // Valor total calculado pelos serviços selecionados
-  const totalCalculado = selecionados.reduce((acc, sv) => acc + parseFloat(sv.valor || 0), 0);
-
-  // CORREÇÃO: inicializa com string vazia e deixa o useEffect definir o valor correto
-  // na primeira renderização, evitando o "0.00" que aparecia quando servicos ainda carregava.
-  const [valorFinal, setValorFinal] = useState('');
-
-  // Atualiza valor automaticamente quando serviços mudam (a menos que tenha editado manualmente)
-  useEffect(() => {
-    if (!valorEditado) {
-      setValorFinal(String(totalCalculado.toFixed(2)));
-    }
-  }, [selecionados, totalCalculado]);
+  const totalTabela = selecionados.reduce((s, sv) => s + parseFloat(sv.valor || 0), 0);
 
   const toggleServico = (servico) => {
     setSelecionados((prev) => {
@@ -663,13 +857,14 @@ function ModalBaixa({ agendamento, servicos, onClose, onSalvo }) {
     });
   };
 
-  const salvar = async () => {
+  const confirmar = async () => {
     try {
+      const valorFinal = valorCustom ? parseFloat(valorCustom) : totalTabela;
       await agendamentosApi.darBaixa(agendamento.id, {
         status,
         observacao:  obs,
         servico_ids: selecionados.map((s) => s.id),
-        valor_final: parseFloat(valorFinal) || totalCalculado,
+        valor_final: valorFinal,
       });
       onSalvo();
     } catch (e) { Alert.alert('Erro', e.message); }
@@ -678,84 +873,75 @@ function ModalBaixa({ agendamento, servicos, onClose, onSalvo }) {
   return (
     <Modal animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-        <View style={[S.header, { borderBottomWidth: 1, borderBottomColor: C.border }]}>
-          <TouchableOpacity onPress={onClose}><Text style={{ color: C.muted }}>Cancelar</Text></TouchableOpacity>
-          <Text style={S.headerTitle}>Dar Baixa</Text>
-          <TouchableOpacity onPress={salvar}><Text style={{ color: C.pink, fontWeight: '600' }}>Confirmar</Text></TouchableOpacity>
+        <View style={S.header}>
+          <TouchableOpacity onPress={onClose}><Text style={{ color: C.muted }}>Fechar</Text></TouchableOpacity>
+          <Text style={S.headerTitle}>Concluir Atendimento</Text>
+          <TouchableOpacity onPress={confirmar}><Text style={{ color: C.green, fontWeight: '600' }}>Confirmar</Text></TouchableOpacity>
         </View>
-
-        <ScrollView style={{ padding: 16 }}>
-          {/* Status */}
-          <Text style={S.label}>Status</Text>
-          {['realizado', 'cancelado'].map((s) => (
-            <TouchableOpacity
-              key={s}
-              style={[S.card, { marginBottom: 8, borderColor: status === s ? C.pink : C.border, borderWidth: status === s ? 2 : 1 }]}
-              onPress={() => setStatus(s)}
-            >
-              <Text style={{ color: C.text }}>{s === 'realizado' ? '✅ Realizado' : '❌ Cancelado'}</Text>
-            </TouchableOpacity>
-          ))}
-
-          {/* Serviços realizados */}
-          <Text style={[S.label, { marginTop: 12 }]}>Serviços realizados</Text>
-          <Text style={[S.hint, { marginBottom: 8 }]}>Ajuste os serviços caso tenha mudado</Text>
-          {servicos.map((s) => {
-            const ativo = selecionados.some((sv) => sv.id === s.id);
-            return (
-              <TouchableOpacity
-                key={s.id}
-                style={[S.card, { marginBottom: 6 }, ativo && { borderColor: C.pink, borderWidth: 2, backgroundColor: C.pinkLight }]}
-                onPress={() => toggleServico(s)}
-              >
-                <View style={S.between}>
-                  <View style={[S.row, { flex: 1 }]}>
-                    <View style={[styles.checkbox, ativo && styles.checkboxAtivo]}>
-                      {ativo && <Text style={{ color: 'white', fontSize: 11, lineHeight: 14 }}>✓</Text>}
-                    </View>
-                    <Text style={[S.bold, { flex: 1 }, ativo && { color: C.pinkDark }]}>{s.nome}</Text>
-                  </View>
-                  <Text style={{ color: C.green, fontWeight: '600', marginLeft: 8 }}>{fmt(s.valor)}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-
-          {/* Valor final */}
-          <View style={[styles.valorBox, { marginTop: 12 }]}>
-            <View style={S.between}>
-              <Text style={styles.valorLabel}>Valor cobrado (R$)</Text>
-              {valorEditado && (
-                <TouchableOpacity onPress={() => { setValorFinal(String(totalCalculado.toFixed(2))); setValorEditado(false); }}>
-                  <Text style={{ fontSize: 11, color: C.pink }}>Restaurar</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <TextInput
-              style={styles.valorInput}
-              value={valorFinal}
-              onChangeText={(v) => { setValorFinal(v); setValorEditado(true); }}
-              keyboardType="decimal-pad"
-              placeholder="0.00"
-            />
-            {selecionados.length > 0 && (
-              <Text style={styles.valorHint}>
-                Valor dos serviços: {fmt(totalCalculado)}
-                {valorEditado && parseFloat(valorFinal) !== totalCalculado
-                  ? parseFloat(valorFinal) < totalCalculado
-                    ? `  •  Desconto: ${fmt(totalCalculado - parseFloat(valorFinal))}`
-                    : `  •  Acréscimo: ${fmt(parseFloat(valorFinal) - totalCalculado)}`
-                  : ''}
-              </Text>
-            )}
+        <ScrollView style={{ padding: 18 }}>
+          <View style={[S.card, { backgroundColor: C.pinkLight, borderColor: C.pinkSoft, marginBottom: 14 }]}>
+            <Text style={{ fontWeight: '600', color: C.pinkDark, fontSize: 15 }}>{agendamento.cliente_nome}</Text>
+            <Text style={S.hint}>{fmtHora(agendamento.data_hora)}</Text>
           </View>
 
-          {/* Observação */}
-          <Text style={[S.label, { marginTop: 12 }]}>Observação</Text>
+          <Text style={S.label}>Resultado do atendimento</Text>
+          <View style={[S.row, { marginBottom: 16 }]}>
+            {[
+              { val: 'realizado', label: 'Realizado', cor: C.green, bg: C.greenLight },
+              { val: 'cancelado', label: 'Cancelado', cor: C.red,   bg: C.redLight   },
+            ].map((op) => (
+              <TouchableOpacity
+                key={op.val}
+                style={{
+                  flex: 1, padding: 12, borderRadius: 12, alignItems: 'center',
+                  borderWidth: 1.5,
+                  borderColor: status === op.val ? op.cor : C.border,
+                  backgroundColor: status === op.val ? op.bg : 'white',
+                }}
+                onPress={() => setStatus(op.val)}
+              >
+                <Text style={{ fontWeight: '600', color: status === op.val ? op.cor : C.muted }}>{op.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {status === 'realizado' && (
+            <>
+              <ServicoSelector
+                servicos={servicos}
+                selecionados={selecionados}
+                toggleServico={toggleServico}
+                totalSelecionado={totalTabela}
+              />
+              <Text style={[S.label, { marginTop: 10 }]}>
+                Valor cobrado (deixe em branco para {fmt(totalTabela)})
+              </Text>
+              <TextInput
+                style={S.input}
+                keyboardType="decimal-pad"
+                placeholder={`Padrão: ${fmt(totalTabela)}`}
+                value={valorCustom}
+                onChangeText={setValorCustom}
+              />
+            </>
+          )}
+
+          <Text style={S.label}>Observação</Text>
           <TextInput
-            style={[S.input, { height: 80, textAlignVertical: 'top' }]}
-            multiline value={obs} onChangeText={setObs} placeholder="Opcional..."
+            style={[S.input, { height: 75, textAlignVertical: 'top' }]}
+            multiline
+            value={obs}
+            onChangeText={setObs}
           />
+
+          <TouchableOpacity
+            style={[S.btnPrimary, { backgroundColor: status === 'realizado' ? C.green : C.red, marginTop: 8 }]}
+            onPress={confirmar}
+          >
+            <Text style={S.btnPrimaryText}>
+              {status === 'realizado' ? 'Confirmar Recebimento' : 'Confirmar Cancelamento'}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -767,131 +953,298 @@ function ModalBaixa({ agendamento, servicos, onClose, onSalvo }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function ClienteSelector({ cliente, setCliente, clienteBusca, buscarCliente, clienteLista, setLista, setBusca }) {
   return (
-    <>
-      <Text style={S.label}>Cliente *</Text>
+    <View style={{ marginBottom: 12 }}>
       {cliente ? (
-        <View style={[S.row, { backgroundColor: C.pinkLight, padding: 10, borderRadius: 8, marginBottom: 12 }]}>
-          <Text style={{ flex: 1, color: C.pinkDark, fontWeight: '500' }}>{cliente.nome}</Text>
-          <TouchableOpacity onPress={() => setCliente(null)}>
-            <Text style={{ color: C.pinkDark }}>✕</Text>
+        <View style={[S.between, S.card, { backgroundColor: C.pinkLight, borderColor: C.pinkSoft, marginBottom: 0 }]}>
+          <View>
+            <Text style={{ fontWeight: '600', color: C.pinkDark }}>{cliente.nome}</Text>
+            <Text style={S.hint}>{cliente.telefone}</Text>
+          </View>
+          <TouchableOpacity onPress={() => { setCliente(null); setBusca(''); }}>
+            <Text style={{ color: C.pink, fontSize: 12, fontWeight: '600' }}>Trocar</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <>
-          <TextInput style={S.input} placeholder="Buscar cliente..." value={clienteBusca} onChangeText={buscarCliente} />
+          <TextInput
+            style={[S.input, { marginBottom: 4 }]}
+            placeholder="Digite o nome ou telefone..."
+            value={clienteBusca}
+            onChangeText={buscarCliente}
+          />
           {clienteLista.map((c) => (
-            <TouchableOpacity key={c.id} style={[S.card, { marginBottom: 6 }]} onPress={() => { setCliente(c); setLista([]); setBusca(''); }}>
+            <TouchableOpacity
+              key={c.id}
+              style={{
+                padding: 11, backgroundColor: 'white',
+                borderWidth: 1, borderColor: C.border, borderRadius: 10, marginBottom: 4,
+              }}
+              onPress={() => { setCliente(c); setLista([]); }}
+            >
               <Text style={S.bold}>{c.nome}</Text>
               <Text style={S.hint}>{c.telefone}</Text>
             </TouchableOpacity>
           ))}
         </>
       )}
-    </>
+    </View>
   );
 }
 
 function ServicoSelector({ servicos, selecionados, toggleServico, totalSelecionado }) {
   return (
-    <>
-      <View style={[S.between, { marginBottom: 6, marginTop: 4 }]}>
-        <Text style={S.label}>Serviços * (selecione um ou mais)</Text>
+    <View style={{ marginBottom: 8 }}>
+      <View style={[S.between, { marginBottom: 6 }]}>
+        <Text style={S.label}>Serviços *</Text>
         {selecionados.length > 0 && (
-          <Text style={{ fontSize: 11, color: C.pink, fontWeight: '600' }}>
-            {selecionados.length} selecionado{selecionados.length > 1 ? 's' : ''}
+          <Text style={{ fontSize: 12, fontWeight: '600', color: C.green }}>
+            Total: {fmt(totalSelecionado)}
           </Text>
         )}
       </View>
       {servicos.map((s) => {
-        const ativo = selecionados.some((sv) => sv.id === s.id);
+        const marcado = selecionados.some((sel) => sel.id === s.id);
         return (
           <TouchableOpacity
             key={s.id}
-            style={[S.card, { marginBottom: 6 }, ativo && { borderColor: C.pink, borderWidth: 2, backgroundColor: C.pinkLight }]}
+            style={[
+              S.between,
+              {
+                padding: 12, borderRadius: 12, marginBottom: 6,
+                borderWidth: 1,
+                borderColor: marcado ? C.pink : C.border,
+                backgroundColor: marcado ? C.pinkLight : 'white',
+              },
+            ]}
             onPress={() => toggleServico(s)}
           >
-            <View style={S.between}>
-              <View style={[S.row, { flex: 1 }]}>
-                <View style={[styles.checkbox, ativo && styles.checkboxAtivo]}>
-                  {ativo && <Text style={{ color: 'white', fontSize: 11, lineHeight: 14 }}>✓</Text>}
-                </View>
-                <Text style={[S.bold, { flex: 1 }, ativo && { color: C.pinkDark }]}>{s.nome}</Text>
-              </View>
-              <Text style={{ color: C.green, fontWeight: '600', marginLeft: 8 }}>{fmt(s.valor)}</Text>
-            </View>
+            <Text style={{ color: marcado ? C.pinkDark : C.text, fontWeight: marcado ? '600' : '400', flex: 1 }}>
+              {s.nome}
+            </Text>
+            <Text style={{ color: marcado ? C.pinkDark : C.muted, fontWeight: '600', fontSize: 13 }}>
+              {fmt(s.valor)}
+            </Text>
           </TouchableOpacity>
         );
       })}
-      {selecionados.length > 0 && (
-        <View style={styles.resumoServicos}>
-          <Text style={styles.resumoServicosLabel}>{selecionados.map((s) => s.nome).join('  +  ')}</Text>
-          <Text style={styles.resumoServicosTotalTxt}>Total: {fmt(totalSelecionado)}</Text>
-        </View>
-      )}
-    </>
+    </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Estilos
-// ─────────────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  navBar: { justifyContent: 'space-between', padding: 12, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#0000001A' },
-  navBtn: { padding: 8, borderRadius: 8, backgroundColor: '#f4f3f1' },
-  navTxt: { fontSize: 18, color: '#1a1a18' },
-  dataPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#FBEAF0' },
-  fab: { position: 'absolute', bottom: 24, right: 24, width: 52, height: 52, borderRadius: 26, backgroundColor: '#D4537E', alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: '#D4537E', shadowOpacity: 0.4, shadowOffset: { width: 0, height: 4 }, shadowRadius: 8 },
-  btnAcao: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  totalBadge: { alignSelf: 'flex-start', backgroundColor: '#EAF3DE', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 },
-  totalBadgeTxt: { color: '#1D9E75', fontWeight: '700', fontSize: 12 },
-  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: '#0000001A', alignItems: 'center', justifyContent: 'center', marginRight: 8, backgroundColor: 'white' },
-  checkboxAtivo: { backgroundColor: '#D4537E', borderColor: '#D4537E' },
-  resumoServicos: { backgroundColor: '#F0FAF5', borderRadius: 10, borderWidth: 1, borderColor: '#C6EAD9', padding: 12, marginBottom: 16, marginTop: 4 },
-  resumoServicosLabel: { color: '#1D9E75', fontSize: 13, fontWeight: '500' },
-  resumoServicosTotalTxt: { color: '#1D9E75', fontSize: 17, fontWeight: '800', marginTop: 4 },
-
-  // Valor final na baixa
-  valorBox: { backgroundColor: '#FAFAFA', borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginBottom: 4 },
-  valorLabel: { fontSize: 13, fontWeight: '600', color: C.text, marginBottom: 6 },
-  valorInput: { fontSize: 28, fontWeight: '700', color: C.pink, borderBottomWidth: 2, borderBottomColor: C.pink, paddingBottom: 4, marginBottom: 6 },
-  valorHint: { fontSize: 11, color: C.muted },
+  topHeader: {
+    backgroundColor: 'white',
+    paddingHorizontal: 18,
+    paddingTop: 4,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  topCount: {
+    fontSize: 13,
+    color: C.muted,
+  },
+  btnAgendarPill: {
+    backgroundColor: C.pink,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 99,
+  },
+  btnAgendarPillText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  dateSelectorWrapper: {
+    backgroundColor: 'white',
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.border,
+  },
+  daysStripRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 4,
+  },
+  edgeArrowBtn: {
+    width: 32,
+    height: 48,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.bg,
+  },
+  edgeArrowText: {
+    fontSize: 22,
+    color: C.pink,
+    fontWeight: '600',
+    lineHeight: 24,
+  },
+  daysStripCenter: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  dayCard: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+  },
+  dayCardAtivo: {
+    backgroundColor: C.pink,
+    borderColor: C.pink,
+  },
+  dayWeekTxt: {
+    fontSize: 11,
+    color: C.hint,
+    fontWeight: '500',
+  },
+  dayWeekTxtAtivo: {
+    color: C.pinkLight,
+  },
+  dayNumTxt: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.text,
+    marginTop: 2,
+  },
+  dayNumTxtAtivo: {
+    color: 'white',
+  },
+  openCalendarHandle: {
+    marginTop: 8,
+    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  openCalendarText: {
+    fontSize: 12,
+    color: C.muted,
+    fontWeight: '500',
+  },
+  openCalendarArrow: {
+    fontSize: 11,
+    color: C.pink,
+  },
+  agCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 15,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  agTimeCol: {
+    width: 56,
+    paddingTop: 1,
+  },
+  agHoraTxt: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.text,
+  },
+  agStatusTxt: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  agMainCol: {
+    flex: 1,
+    borderLeftWidth: 1,
+    borderLeftColor: C.border,
+    paddingLeft: 14,
+  },
+  agClienteTxt: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.text,
+    flex: 1,
+    marginRight: 8,
+  },
+  agValorTxt: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: C.muted,
+  },
+  agServicosTxt: {
+    fontSize: 13,
+    color: C.hint,
+    marginTop: 3,
+  },
+  agObsTxt: {
+    fontSize: 12,
+    color: C.muted,
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  agLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  linkBaixa: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: C.pink,
+  },
+  linkMuted: {
+    fontSize: 13,
+    color: C.hint,
+  },
+  dotSep: {
+    fontSize: 12,
+    color: C.border,
+  },
 });
 
 const cal = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center' },
-  container: { backgroundColor: 'white', borderRadius: 20, padding: 20, width: 340, shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 8 }, shadowRadius: 20, elevation: 10 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  titulo: { fontSize: 17, fontWeight: '700', color: '#1a1a18' },
-  navBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#f4f3f1', alignItems: 'center', justifyContent: 'center' },
-  navTxt: { fontSize: 22, color: '#1a1a18', lineHeight: 26 },
-  semanaRow: { flexDirection: 'row', marginBottom: 8 },
-  semanaLabel: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#9c9a94' },
-  grade: { flexDirection: 'row', flexWrap: 'wrap' },
-  celula: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 100 },
-  celulaSelected: { backgroundColor: '#D4537E' },
-  celulaHoje: { backgroundColor: '#FBEAF0' },
-  celulaText: { fontSize: 14, color: '#1a1a18' },
+  overlay:    { flex: 1, backgroundColor: 'rgba(58,38,48,0.35)', justifyContent: 'center', alignItems: 'center' },
+  container:  { backgroundColor: 'white', borderRadius: 20, padding: 18, width: 325, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 16, elevation: 6 },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  titulo:     { fontSize: 16, fontWeight: '600', color: C.text },
+  navBtn:     { padding: 6, borderRadius: 10, backgroundColor: C.pinkLight },
+  navTxt:     { fontSize: 18, color: C.pink, fontWeight: '600', paddingHorizontal: 4 },
+  semanaRow:  { flexDirection: 'row', marginBottom: 6 },
+  semanaLabel:{ flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '600', color: C.hint },
+  grade:      { flexDirection: 'row', flexWrap: 'wrap' },
+  celula:     { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 99 },
+  celulaSelected:     { backgroundColor: C.pink },
+  celulaHoje:         { borderWidth: 1.5, borderColor: C.pink },
+  celulaText:         { fontSize: 13, color: C.text },
   celulaSelectedText: { color: 'white', fontWeight: '700' },
-  celulaHojeText: { color: '#D4537E', fontWeight: '700' },
-  btnHoje: { marginTop: 14, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#D4537E', alignItems: 'center' },
-  btnHojeTxt: { color: '#D4537E', fontWeight: '600', fontSize: 14 },
+  celulaHojeText:     { color: C.pink, fontWeight: '700' },
+  btnHoje:    { marginTop: 12, padding: 10, borderRadius: 12, backgroundColor: C.pinkLight, alignItems: 'center' },
+  btnHojeTxt: { color: C.pinkDark, fontWeight: '600', fontSize: 13 },
 });
 
 const relogio = StyleSheet.create({
-  container: { backgroundColor: 'white', borderRadius: 20, padding: 20, width: 300, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.2, shadowOffset: { width: 0, height: 8 }, shadowRadius: 20, elevation: 10 },
-  display: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  displayTxt: { fontSize: 40, fontWeight: '700', color: '#c8c6c1' },
-  displayTxtAtivo: { color: '#D4537E' },
-  ampmBox: { marginLeft: 14 },
-  ampmBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  ampmBtnAtivo: { backgroundColor: '#FBEAF0' },
-  ampmTxt: { fontSize: 13, fontWeight: '600', color: '#9c9a94' },
-  ampmTxtAtivo: { color: '#D4537E' },
-  face: { width: 200, height: 200, borderRadius: 100, backgroundColor: '#f4f3f1' },
-  centro: { position: 'absolute', width: 8, height: 8, borderRadius: 4, backgroundColor: '#D4537E', left: 96, top: 96 },
-  numero: { position: 'absolute', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  numeroAtivo: { backgroundColor: '#D4537E' },
-  numeroTxt: { fontSize: 14, color: '#1a1a18' },
-  numeroTxtAtivo: { color: 'white', fontWeight: '700' },
-  dica: { marginTop: 14, fontSize: 12, color: '#9c9a94', textAlign: 'center' },
+  container: { backgroundColor: 'white', borderRadius: 20, padding: 20, width: 300, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 16, elevation: 6 },
+  display:   { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 4 },
+  displayTxt:      { fontSize: 36, fontWeight: '700', color: C.hint, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
+  displayTxtAtivo: { color: C.pink, backgroundColor: C.pinkLight },
+  ampmBox:   { marginLeft: 8, gap: 4 },
+  ampmBtn:   { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: C.bg2 },
+  ampmBtnAtivo: { backgroundColor: C.pink },
+  ampmTxt:      { fontSize: 12, fontWeight: '600', color: C.muted },
+  ampmTxtAtivo: { color: 'white' },
+  face:      { width: 200, height: 200, borderRadius: 100, backgroundColor: C.bg, position: 'relative', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border },
+  centro:    { width: 8, height: 8, borderRadius: 4, backgroundColor: C.pink },
+  numero:    { position: 'absolute', width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  numeroAtivo:    { backgroundColor: C.pink },
+  numeroTxt:      { fontSize: 13, fontWeight: '600', color: C.text },
+  numeroTxtAtivo: { color: 'white' },
+  dica:      { marginTop: 14, fontSize: 11, color: C.hint, textAlign: 'center' },
 });
