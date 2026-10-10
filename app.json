@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "BeautyFlow",
+    "slug": "beautyflow",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#FBEAF0"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.beautyflow.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FBEAF0"
+      },
+      "package": "com.beautyflow.app",
+      "usesCleartextTraffic": true,
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "POST_NOTIFICATIONS",
+        "NEARBY_WIFI_DEVICES"
+      ]
+    },
+    "scheme": "beautyflow",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#D4537E",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "9aab3f3e-4b17-4c22-9762-cc86f4a0cdfb"
+      }
+    },
+    "owner": "reh_1008"
+  }
+}
