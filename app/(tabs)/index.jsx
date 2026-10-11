@@ -17,7 +17,7 @@ const DIAS_CURTOS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 // ─────────────────────────────────────────────────────────────────────────────
 // Calendário mensal (abre ao clicar na seta para baixo abaixo dos dias)
 // ─────────────────────────────────────────────────────────────────────────────
-function ModalCalendario({ dataAtual, onClose, onSelectData }) {
+function ModalCalendario({ dataAtual, diasIndisponiveis = {}, onClose, onSelectData }) {
   const [ano, setAno] = useState(parseInt(dataAtual.slice(0, 4), 10));
   const [mes, setMes] = useState(parseInt(dataAtual.slice(5, 7), 10) - 1);
   const hoje = new Date().toISOString().slice(0, 10);
@@ -69,6 +69,7 @@ function ModalCalendario({ dataAtual, onClose, onSelectData }) {
               const iso = dia ? toISO(dia) : null;
               const selecionado = iso && iso === dataAtual;
               const ehHoje      = iso && iso === hoje;
+              const bloqueado   = iso && Boolean(diasIndisponiveis[iso]);
               return (
                 <TouchableOpacity
                   key={i}
@@ -76,6 +77,7 @@ function ModalCalendario({ dataAtual, onClose, onSelectData }) {
                     cal.celula,
                     selecionado && cal.celulaSelected,
                     !selecionado && ehHoje && cal.celulaHoje,
+                    !selecionado && bloqueado && { backgroundColor: C.redLight, borderRadius: 19 },
                   ]}
                   onPress={() => {
                     if (!dia) return;
@@ -89,6 +91,7 @@ function ModalCalendario({ dataAtual, onClose, onSelectData }) {
                       cal.celulaText,
                       selecionado && cal.celulaSelectedText,
                       !selecionado && ehHoje && cal.celulaHojeText,
+                      !selecionado && bloqueado && { color: C.red, fontWeight: '700' },
                       !dia && { opacity: 0 },
                     ]}
                   >
@@ -373,19 +376,36 @@ function gerarDiasAoRedor(dataIso) {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AgendaScreen() {
   const hoje = new Date().toISOString().slice(0, 10);
-  const [data, setData]               = useState(hoje);
-  const [agendamentos, setAgs]        = useState([]);
-  const [servicos, setServicos]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [modalNovo, setModalNovo]     = useState(false);
-  const [modalEditar, setModalEditar] = useState(null);
-  const [modalBaixa, setModalBaixa]   = useState(null);
-  const [modalCal, setModalCal]       = useState(false);
+  const [data, setData]                   = useState(hoje);
+  const [agendamentos, setAgs]            = useState([]);
+  const [servicos, setServicos]           = useState([]);
+  const [diasIndisponiveis, setIndisp]    = useState({});
+  const [loading, setLoading]             = useState(true);
+  const [modalNovo, setModalNovo]         = useState(false);
+  const [modalEditar, setModalEditar]     = useState(null);
+  const [modalBaixa, setModalBaixa]       = useState(null);
+  const [modalCal, setModalCal]           = useState(false);
+
+  const carregarIndisponiveis = useCallback(async () => {
+    try {
+      const rows = await agendamentosApi.listarIndisponiveis();
+      const mapa = {};
+      (rows || []).forEach((r) => {
+        mapa[r.data] = r.motivo || 'Indisponível / Folga';
+      });
+      setIndisp(mapa);
+    } catch {
+      // ignora silenciosamente se endpoint ainda não existir
+    }
+  }, []);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
-      const lista = await agendamentosApi.listarPorData(data);
+      const [lista] = await Promise.all([
+        agendamentosApi.listarPorData(data),
+        carregarIndisponiveis(),
+      ]);
       setAgs(lista);
       agendarNotificacoesParaData(lista, data);
     } catch (e) {
@@ -393,7 +413,7 @@ export default function AgendaScreen() {
     } finally {
       setLoading(false);
     }
-  }, [data]);
+  }, [data, carregarIndisponiveis]);
 
   useEffect(() => {
     carregar().then(() => {
@@ -404,6 +424,26 @@ export default function AgendaScreen() {
   useEffect(() => {
     servicosApi.listar().then(setServicos).catch(() => {});
   }, []);
+
+  const diaAtualIndisponivel = Boolean(diasIndisponiveis[data]);
+
+  const alternarIndisponibilidadeDia = async () => {
+    try {
+      if (diaAtualIndisponivel) {
+        await agendamentosApi.removerIndisponivel(data);
+        await carregarIndisponiveis();
+      } else {
+        await agendamentosApi.marcarIndisponivel(data, 'Indisponível / Folga');
+        await carregarIndisponiveis();
+        Alert.alert(
+          'Dia marcado como indisponível',
+          'A API e o assistente de Retorno sabem que você não atenderá neste dia.'
+        );
+      }
+    } catch (e) {
+      Alert.alert('Erro', e.message);
+    }
+  };
 
   const mudarData = (delta) => {
     const dt = new Date(data + 'T12:00:00');
@@ -435,16 +475,34 @@ export default function AgendaScreen() {
 
   return (
     <SafeAreaView style={S.screen} edges={['bottom']}>
-      {/* Subcabeçalho Clean com contador e botão + Agendar */}
+      {/* Subcabeçalho Clean com contador, botão de indisponibilidade e botão + Agendar */}
       <View style={styles.topHeader}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.topCount}>
             {agendamentos.length} {agendamentos.length === 1 ? 'atendimento' : 'atendimentos'} no dia
           </Text>
         </View>
-        <TouchableOpacity style={styles.btnAgendarPill} onPress={() => setModalNovo(true)}>
-          <Text style={styles.btnAgendarPillText}>+ Agendar</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={{
+              paddingHorizontal: 11,
+              paddingVertical: 8,
+              borderRadius: 99,
+              borderWidth: 1,
+              borderColor: diaAtualIndisponivel ? C.red : C.border,
+              backgroundColor: diaAtualIndisponivel ? C.redLight : 'white',
+            }}
+            onPress={alternarIndisponibilidadeDia}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: diaAtualIndisponivel ? C.red : C.muted }}>
+              {diaAtualIndisponivel ? '🔓 Liberar dia' : '🔒 Folga / Indisp.'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.btnAgendarPill} onPress={() => setModalNovo(true)}>
+            <Text style={styles.btnAgendarPillText}>+ Agendar</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Seletor de Dias com Setas nas Extremidades + Seta para baixo para abrir o Calendário */}
@@ -457,17 +515,34 @@ export default function AgendaScreen() {
           <View style={styles.daysStripCenter}>
             {diasVisiveis.map((item) => {
               const ativo = item.iso === data;
+              const indisp = Boolean(diasIndisponiveis[item.iso]);
               return (
                 <TouchableOpacity
                   key={item.iso}
-                  style={[styles.dayCard, ativo && styles.dayCardAtivo]}
+                  style={[
+                    styles.dayCard,
+                    indisp && !ativo && { backgroundColor: C.redLight, borderColor: '#F5C4C4' },
+                    ativo && styles.dayCardAtivo,
+                  ]}
                   onPress={() => setData(item.iso)}
                 >
-                  <Text style={[styles.dayWeekTxt, ativo && styles.dayWeekTxtAtivo]}>
+                  <Text
+                    style={[
+                      styles.dayWeekTxt,
+                      indisp && !ativo && { color: C.red },
+                      ativo && styles.dayWeekTxtAtivo,
+                    ]}
+                  >
                     {item.semana}
                   </Text>
-                  <Text style={[styles.dayNumTxt, ativo && styles.dayNumTxtAtivo]}>
-                    {item.diaNum}
+                  <Text
+                    style={[
+                      styles.dayNumTxt,
+                      indisp && !ativo && { color: C.red },
+                      ativo && styles.dayNumTxtAtivo,
+                    ]}
+                  >
+                    {item.diaNum}{indisp ? '🔒' : ''}
                   </Text>
                 </TouchableOpacity>
               );
@@ -490,18 +565,43 @@ export default function AgendaScreen() {
         </TouchableOpacity>
       </View>
 
+      {diaAtualIndisponivel && (
+        <View style={{
+          marginHorizontal: 14,
+          marginTop: 10,
+          padding: 11,
+          borderRadius: 12,
+          backgroundColor: C.redLight,
+          borderWidth: 1,
+          borderColor: '#F5C4C4',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <Text style={{ fontSize: 12, color: C.red, fontWeight: '600', flex: 1 }}>
+            🔒 Dia marcado como indisponível (a IA de retorno não sugerirá esta data).
+          </Text>
+        </View>
+      )}
+
       <ScrollView style={S.content}>
         {loading ? (
           <ActivityIndicator color={C.pink} style={{ marginTop: 40 }} />
         ) : agendamentos.length === 0 ? (
           <View style={{ alignItems: 'center', marginTop: 60 }}>
-            <Text style={[S.muted, { textAlign: 'center' }]}>Nenhum agendamento para este dia.</Text>
-            <TouchableOpacity
-              style={{ marginTop: 14, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 99, backgroundColor: C.pinkLight }}
-              onPress={() => setModalNovo(true)}
-            >
-              <Text style={{ color: C.pinkDark, fontWeight: '600', fontSize: 13 }}>+ Agendar horário</Text>
-            </TouchableOpacity>
+            <Text style={[S.muted, { textAlign: 'center' }]}>
+              {diaAtualIndisponivel
+                ? 'Este dia está marcado como indisponível / folga.'
+                : 'Nenhum agendamento para este dia.'}
+            </Text>
+            {!diaAtualIndisponivel && (
+              <TouchableOpacity
+                style={{ marginTop: 14, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 99, backgroundColor: C.pinkLight }}
+                onPress={() => setModalNovo(true)}
+              >
+                <Text style={{ color: C.pinkDark, fontWeight: '600', fontSize: 13 }}>+ Agendar horário</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           agendamentos.map((a) => {
@@ -582,6 +682,7 @@ export default function AgendaScreen() {
       {modalCal && (
         <ModalCalendario
           dataAtual={data}
+          diasIndisponiveis={diasIndisponiveis}
           onClose={() => setModalCal(false)}
           onSelectData={(novaData) => setData(novaData)}
         />

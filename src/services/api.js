@@ -127,12 +127,15 @@ export const servicosApi = {
 };
 
 export const agendamentosApi = {
-  listarPorData:           (data)     => api.get(`/agendamentos?data=${data}`),
-  sincronizarNotificacoes: ()         => api.get('/agendamentos/sincronizar-notificacoes'),
-  criar:                   (body)     => api.post('/agendamentos', body),
-  atualizar:               (id, body) => api.put(`/agendamentos/${id}`, body),
-  darBaixa:                (id, body) => api.patch(`/agendamentos/${id}/baixa`, body),
-  excluir:                 (id)       => api.delete(`/agendamentos/${id}`),
+  listarPorData:           (data)         => api.get(`/agendamentos?data=${data}`),
+  sincronizarNotificacoes: ()             => api.get('/agendamentos/sincronizar-notificacoes'),
+  listarIndisponiveis:     ()             => api.get('/agendamentos/indisponiveis'),
+  marcarIndisponivel:      (data, motivo) => api.post('/agendamentos/indisponiveis', { data, motivo }),
+  removerIndisponivel:     (data)         => api.delete(`/agendamentos/indisponiveis/${data}`),
+  criar:                   (body)         => api.post('/agendamentos', body),
+  atualizar:               (id, body)     => api.put(`/agendamentos/${id}`, body),
+  darBaixa:                (id, body)     => api.patch(`/agendamentos/${id}/baixa`, body),
+  excluir:                 (id)           => api.delete(`/agendamentos/${id}`),
 };
 
 export const consumoApi = {
