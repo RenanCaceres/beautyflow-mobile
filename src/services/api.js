@@ -166,6 +166,8 @@ export const whatsappApi = {
   fila: () => api.get('/whatsapp/fila'),
   enviarRetorno: (body) => api.post('/whatsapp/retorno', body),
   dispararRetornos: (body) => api.post('/whatsapp/retorno/disparar', body),
+  aprovarRetornos: (ids) => api.post('/whatsapp/retorno/aprovar', { ids }),
+  rejeitarRetornos: () => api.post('/whatsapp/retorno/rejeitar', {}),
   dispararCampanha: (body) => api.post('/whatsapp/campanha', body),
 };
 

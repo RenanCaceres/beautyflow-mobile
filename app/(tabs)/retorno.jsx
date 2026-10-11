@@ -209,6 +209,132 @@ function ModalMensagemIA({
   );
 }
 
+// Modal para revisar/selecionar quais clientes do lote automático de hoje devem receber a mensagem
+function ModalConfirmarLoteAutomatico({
+  visible, itens = [], selecionados = {}, onToggle, onConfirmar, onRejeitar, onFechar, processando,
+}) {
+  const qtdMarcados = Object.values(selecionados).filter(Boolean).length;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onFechar}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
+        <RNSafeAreaView style={{
+          backgroundColor: 'white',
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          padding: 16,
+          maxHeight: '84%',
+        }}>
+          <View style={[S.between, { marginBottom: 8 }]}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              <Text style={[S.bold, { fontSize: 16, color: C.text }]}>
+                Confirmar Envio de Retorno ({qtdMarcados}/{itens.length})
+              </Text>
+              <Text style={S.hint}>
+                Desmarque caso não queira enviar para alguma cliente hoje.
+              </Text>
+            </View>
+            <TouchableOpacity onPress={onFechar} style={{ padding: 6 }}>
+              <Text style={{ fontSize: 16, color: C.muted, fontWeight: '600' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ marginVertical: 8 }}>
+            {itens.map((item) => {
+              const marcado = Boolean(selecionados[item.id]);
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  activeOpacity={0.8}
+                  onPress={() => onToggle(item.id)}
+                  style={{
+                    backgroundColor: marcado ? '#FFF9FB' : C.bg,
+                    borderWidth: 1,
+                    borderColor: marcado ? C.pink : C.border,
+                    borderRadius: 12,
+                    padding: 12,
+                    marginBottom: 8,
+                    flexDirection: 'row',
+                    gap: 10,
+                    alignItems: 'flex-start',
+                  }}
+                >
+                  <View style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 6,
+                    borderWidth: 2,
+                    borderColor: marcado ? C.pink : C.hint,
+                    backgroundColor: marcado ? C.pink : 'white',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 2,
+                  }}>
+                    {marcado && <Text style={{ color: 'white', fontSize: 12, fontWeight: '800' }}>✓</Text>}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[S.bold, { fontSize: 14, color: C.text }]}>{item.cliente_nome}</Text>
+                    <Text style={[S.hint, { marginBottom: 4 }]}>{item.telefone}</Text>
+                    <Text style={{ fontSize: 12, color: C.muted, lineHeight: 17 }}>{item.texto}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <View style={{ gap: 8, marginTop: 4 }}>
+            <TouchableOpacity
+              disabled={processando || qtdMarcados === 0}
+              onPress={onConfirmar}
+              style={{
+                backgroundColor: C.pink,
+                paddingVertical: 13,
+                borderRadius: 10,
+                alignItems: 'center',
+                opacity: processando || qtdMarcados === 0 ? 0.5 : 1,
+              }}
+            >
+              <Text style={{ color: 'white', fontWeight: '700', fontSize: 14 }}>
+                {processando ? 'Autorizando envio...' : `✅ Autorizar e Enviar (${qtdMarcados})`}
+              </Text>
+            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TouchableOpacity
+                disabled={processando}
+                onPress={onRejeitar}
+                style={{
+                  flex: 1,
+                  paddingVertical: 11,
+                  borderRadius: 10,
+                  backgroundColor: C.redLight,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: C.red, fontWeight: '700', fontSize: 13 }}>Não enviar hoje</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                disabled={processando}
+                onPress={onFechar}
+                style={{
+                  flex: 1,
+                  paddingVertical: 11,
+                  borderRadius: 10,
+                  backgroundColor: C.bg2,
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ color: C.muted, fontWeight: '600', fontSize: 13 }}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </RNSafeAreaView>
+      </View>
+    </Modal>
+  );
+}
+
 export default function RetornoScreen() {
   const [filtro, setFiltro]     = useState('todas');
   const [clientes, setClientes] = useState([]);
@@ -226,14 +352,23 @@ export default function RetornoScreen() {
   const [clienteAtual, setClienteAtual] = useState(null);
   const [servicoAtual, setServicoAtual] = useState(null);
 
-  // Status da fila do WAHA e disparo em lote
-  const [filaInfo, setFilaInfo]             = useState(null);
-  const [disparandoLote, setDisparandoLote] = useState(false);
+  // Status da fila do WAHA, disparo em lote e confirmação do automático
+  const [filaInfo, setFilaInfo]                   = useState(null);
+  const [disparandoLote, setDisparandoLote]       = useState(false);
+  const [modalConfirmarAuto, setModalConfirmarAuto] = useState(false);
+  const [selecionadosAuto, setSelecionadosAuto]   = useState({});
+  const [processandoAuto, setProcessandoAuto]     = useState(false);
 
   const carregarFila = async () => {
     try {
       const info = await whatsappApi.fila();
       setFilaInfo(info);
+      const listaAprov = Array.isArray(info?.aguardandoAprovacao) ? info.aguardandoAprovacao : [];
+      if (listaAprov.length > 0) {
+        const mapa = {};
+        listaAprov.forEach((it) => { mapa[it.id] = true; });
+        setSelecionadosAuto(mapa);
+      }
     } catch {
       // ignora silenciosamente se endpoint ainda não estiver ativo
     }
@@ -253,6 +388,62 @@ export default function RetornoScreen() {
   };
 
   useEffect(() => { carregar(); }, [filtro]);
+
+  const toggleItemAuto = (id) => {
+    setSelecionadosAuto((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const aprovarEnvioAutomatico = async (idsCustom = null) => {
+    const listaAprov = Array.isArray(filaInfo?.aguardandoAprovacao) ? filaInfo.aguardandoAprovacao : [];
+    const idsParaAprovar = idsCustom || listaAprov.filter((it) => selecionadosAuto[it.id]).map((it) => it.id);
+    if (idsParaAprovar.length === 0) {
+      Alert.alert('Atenção', 'Selecione pelo menos uma cliente para autorizar o envio.');
+      return;
+    }
+
+    setProcessandoAuto(true);
+    try {
+      const r = await whatsappApi.aprovarRetornos(idsParaAprovar);
+      setModalConfirmarAuto(false);
+      await carregarFila();
+      const cfg = r?.config;
+      Alert.alert(
+        'Envio autorizado!',
+        `${r.aprovadas} mensagem(ns) liberada(s) para envio no WhatsApp` +
+          (cfg ? ` com intervalo de segurança (${cfg.delayMinSegundos}s a ${cfg.delayMaxSegundos}s).` : '.')
+      );
+    } catch (e) {
+      Alert.alert('Erro ao autorizar', e.message);
+    } finally {
+      setProcessandoAuto(false);
+    }
+  };
+
+  const rejeitarEnvioAutomatico = () => {
+    Alert.alert(
+      'Cancelar envio de hoje?',
+      'As mensagens automáticas preparadas hoje serão descartadas e não serão enviadas.',
+      [
+        { text: 'Voltar', style: 'cancel' },
+        {
+          text: 'Sim, não enviar hoje',
+          style: 'destructive',
+          onPress: async () => {
+            setProcessandoAuto(true);
+            try {
+              await whatsappApi.rejeitarRetornos();
+              setModalConfirmarAuto(false);
+              await carregarFila();
+            } catch (e) {
+              Alert.alert('Erro', e.message);
+            } finally {
+              setProcessandoAuto(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const enviarWhatsApp = (telefone, texto) => {
     const tel = telefone.replace(/\D/g, '');
@@ -364,6 +555,7 @@ export default function RetornoScreen() {
 
   const iniciais = (nome) => nome.split(' ').slice(0, 2).map((p) => p[0]).join('').toUpperCase();
   const pendentesFila = (filaInfo?.contadores?.pendente || 0) + (filaInfo?.contadores?.enviando || 0);
+  const listaAguardando = Array.isArray(filaInfo?.aguardandoAprovacao) ? filaInfo.aguardandoAprovacao : [];
 
   return (
     <SafeAreaView style={S.screen} edges={['bottom']}>
@@ -385,7 +577,79 @@ export default function RetornoScreen() {
         ))}
       </ScrollView>
 
-      {/* Barra WAHA de disparo automático / em lote com proteção anti-ban */}
+      {/* Card de Confirmação quando o Job Automático preparou mensagens e aguarda permissão da dona */}
+      {listaAguardando.length > 0 && (
+        <View style={{
+          marginHorizontal: 14,
+          marginTop: 10,
+          padding: 13,
+          borderRadius: 14,
+          backgroundColor: '#FFF5F8',
+          borderWidth: 1.5,
+          borderColor: C.pink,
+          gap: 8,
+        }}>
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: C.pinkDark }}>
+              🔔 Posso enviar as mensagens de retorno de hoje? ({listaAguardando.length})
+            </Text>
+            <Text style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+              Clientes: {listaAguardando.map((i) => i.cliente_nome.split(' ')[0]).join(', ')}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            <TouchableOpacity
+              disabled={processandoAuto}
+              onPress={() => aprovarEnvioAutomatico(listaAguardando.map((i) => i.id))}
+              style={{
+                backgroundColor: C.pink,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 9,
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>
+                ✅ Sim, pode enviar
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              disabled={processandoAuto}
+              onPress={() => setModalConfirmarAuto(true)}
+              style={{
+                backgroundColor: 'white',
+                borderWidth: 1,
+                borderColor: C.pink,
+                paddingHorizontal: 11,
+                paddingVertical: 8,
+                borderRadius: 9,
+              }}
+            >
+              <Text style={{ color: C.pinkDark, fontSize: 12, fontWeight: '700' }}>
+                👁️ Revisar / Escolher
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              disabled={processandoAuto}
+              onPress={rejeitarEnvioAutomatico}
+              style={{
+                backgroundColor: C.redLight,
+                paddingHorizontal: 11,
+                paddingVertical: 8,
+                borderRadius: 9,
+              }}
+            >
+              <Text style={{ color: C.red, fontSize: 12, fontWeight: '700' }}>
+                ✕ Não enviar
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Barra WAHA de disparo manual / em lote com proteção anti-ban */}
       <View style={{
         backgroundColor: 'white',
         paddingHorizontal: 14,
@@ -495,6 +759,17 @@ export default function RetornoScreen() {
         onEnviarWaha={confirmarEnvioWaha}
         onEnviarWhatsAppDireto={confirmarEnvioWhatsAppDireto}
         onFechar={() => setModalAberto(false)}
+      />
+
+      <ModalConfirmarLoteAutomatico
+        visible={modalConfirmarAuto}
+        itens={listaAguardando}
+        selecionados={selecionadosAuto}
+        onToggle={toggleItemAuto}
+        onConfirmar={() => aprovarEnvioAutomatico()}
+        onRejeitar={rejeitarEnvioAutomatico}
+        onFechar={() => setModalConfirmarAuto(false)}
+        processando={processandoAuto}
       />
     </SafeAreaView>
   );

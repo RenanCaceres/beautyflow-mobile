@@ -228,6 +228,21 @@ export async function sincronizarTodasNotificacoes() {
         });
       }
     }
+
+    // ── 5. Notificação de Confirmação do Disparo Automático de Retorno ────────
+    const qtdAprovacao = Number(dados?.retornosAguardandoAprovacao || 0);
+    if (qtdAprovacao > 0) {
+      const disparoConfirmacao = new Date(Date.now() + 3000);
+      await Notifications.scheduleNotificationAsync({
+        identifier: `retorno_confirmar_${new Date().toISOString().slice(0, 10)}`,
+        content: {
+          title: `🔄 Autorizar envio de Retorno (${qtdAprovacao})?`,
+          body: `O sistema preparou ${qtdAprovacao} mensagem(ns) de retorno para hoje. Abra a aba Retorno para confirmar se pode enviar no WhatsApp.`,
+          sound: true,
+        },
+        trigger: criarTriggerData(disparoConfirmacao),
+      });
+    }
   } catch (e) {
     console.warn('[Notificacoes] Falha ao sincronizar notificações:', e.message);
   } finally {
